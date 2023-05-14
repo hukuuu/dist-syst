@@ -1,6 +1,10 @@
-use std::io::Write;
+use std::{
+    io::Write,
+    sync::mpsc::{channel, Sender},
+    thread,
+};
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -58,22 +62,25 @@ struct Init {
 }
 
 trait Node<Payload> {
-    fn new() -> Self;
-    fn handle_msg(self: &mut Self, msg: Message<Payload>) -> Message<Payload>;
+    fn new(tx: Sender<Message<Payload>>) -> Self;
+    fn handle_msg(self: &mut Self, msg: Message<Payload>);
 }
 
-struct EchoNode;
+struct EchoNode {
+    tx: Sender<Message<EchoPayload>>,
+}
+
 impl Node<EchoPayload> for EchoNode {
-    fn new() -> Self {
-        Self {}
+    fn new(tx: Sender<Message<EchoPayload>>) -> Self {
+        Self { tx }
     }
 
-    fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) -> Message<EchoPayload> {
+    fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) {
         let mut reply = msg.into_reply(Some(&mut 0));
         if let EchoPayload::Echo { echo } = reply.body.payload {
             reply.body.payload = EchoPayload::EchoOk { echo };
         };
-        reply
+        self.tx.send(reply).unwrap();
     }
 }
 
@@ -86,15 +93,24 @@ fn main() -> Result<()> {
     reply.body.payload = InitPayload::InitOk;
     send(&mut stdout, reply)?;
 
-    let mut echo_node = EchoNode::new();
+    let (tx, rx) = channel();
+    let mut echo_node = EchoNode::new(tx);
+
+    drop(stdout);
+    let jh = thread::spawn(move || {
+        let mut stdout = std::io::stdout().lock();
+        while let Ok(msg) = rx.recv() {
+            send(&mut stdout, msg).unwrap();
+        }
+    });
 
     for msg in stdin {
         let msg = msg.unwrap();
         let msg: Message<EchoPayload> = serde_json::from_str(&msg)?;
-        let reply = echo_node.handle_msg(msg);
-        send(&mut stdout, reply)?;
+        echo_node.handle_msg(msg);
     }
 
+    jh.join().unwrap();
     Ok(())
 }
 
