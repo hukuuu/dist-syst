@@ -26,15 +26,6 @@ impl<Payload> Message<Payload> {
             },
         }
     }
-
-    fn send(&self, out: &mut impl Write) -> Result<()>
-    where
-        Payload: Serialize,
-    {
-        serde_json::to_writer(&mut *out, self).context("serialize response")?;
-        out.write_all(b"\n").context("write newline")?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,13 +58,13 @@ struct Init {
 }
 
 trait Node<Payload> {
-    fn new () -> Self;
-    fn handle_msg(self: &mut Self, msg: Message<Payload>) -> Message<Payload>; 
+    fn new() -> Self;
+    fn handle_msg(self: &mut Self, msg: Message<Payload>) -> Message<Payload>;
 }
 
 struct EchoNode;
 impl Node<EchoPayload> for EchoNode {
-    fn new () -> Self {
+    fn new() -> Self {
         Self {}
     }
 
@@ -93,7 +84,7 @@ fn main() -> Result<()> {
     let init_msg: Message<InitPayload> = serde_json::from_str(&stdin.next().expect("ni raboti")?)?;
     let mut reply = init_msg.into_reply(Some(&mut 0));
     reply.body.payload = InitPayload::InitOk;
-    reply.send(&mut stdout).context("reply to init message")?;
+    send(&mut stdout, reply)?;
 
     let mut echo_node = EchoNode::new();
 
@@ -101,8 +92,17 @@ fn main() -> Result<()> {
         let msg = msg.unwrap();
         let msg: Message<EchoPayload> = serde_json::from_str(&msg)?;
         let reply = echo_node.handle_msg(msg);
-        reply.send(&mut stdout).context("send echo response")?;
+        send(&mut stdout, reply)?;
     }
 
+    Ok(())
+}
+
+fn send<P>(mut out: &mut impl Write, msg: Message<P>) -> Result<()>
+where
+    P: Serialize,
+{
+    serde_json::to_writer(&mut out, &msg).context("write message to out")?;
+    out.write_all(b"\n").context("write newline to out")?;
     Ok(())
 }
