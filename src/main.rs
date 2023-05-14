@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Message<Payload> {
@@ -84,7 +84,11 @@ impl Node<EchoPayload> for EchoNode {
     }
 }
 
-fn main() -> Result<()> {
+fn run<N, P>() -> Result<()>
+where
+    N: Node<P>,
+    P: Serialize + DeserializeOwned + Send + 'static,
+{
     let mut stdin = std::io::stdin().lines();
     let mut stdout = std::io::stdout().lock();
 
@@ -94,7 +98,7 @@ fn main() -> Result<()> {
     send(&mut stdout, reply)?;
 
     let (tx, rx) = channel();
-    let mut echo_node = EchoNode::new(tx);
+    let mut node = N::new(tx);
 
     drop(stdout);
     let jh = thread::spawn(move || {
@@ -105,9 +109,9 @@ fn main() -> Result<()> {
     });
 
     for msg in stdin {
-        let msg = msg.unwrap();
-        let msg: Message<EchoPayload> = serde_json::from_str(&msg)?;
-        echo_node.handle_msg(msg);
+        let msg = msg?;
+        let msg: Message<P> = serde_json::from_str(&msg)?;
+        node.handle_msg(msg);
     }
 
     jh.join().unwrap();
@@ -121,4 +125,8 @@ where
     serde_json::to_writer(&mut out, &msg).context("write message to out")?;
     out.write_all(b"\n").context("write newline to out")?;
     Ok(())
+}
+
+fn main() -> Result<()> {
+    run::<EchoNode, EchoPayload>()
 }
