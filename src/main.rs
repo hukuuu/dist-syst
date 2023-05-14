@@ -66,6 +66,26 @@ struct Init {
     node_ids: Vec<String>,
 }
 
+trait Node<Payload> {
+    fn new () -> Self;
+    fn handle_msg(self: &mut Self, msg: Message<Payload>) -> Message<Payload>; 
+}
+
+struct EchoNode;
+impl Node<EchoPayload> for EchoNode {
+    fn new () -> Self {
+        Self {}
+    }
+
+    fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) -> Message<EchoPayload> {
+        let mut reply = msg.into_reply(Some(&mut 0));
+        if let EchoPayload::Echo { echo } = reply.body.payload {
+            reply.body.payload = EchoPayload::EchoOk { echo };
+        };
+        reply
+    }
+}
+
 fn main() -> Result<()> {
     let mut stdin = std::io::stdin().lines();
     let mut stdout = std::io::stdout().lock();
@@ -75,13 +95,12 @@ fn main() -> Result<()> {
     reply.body.payload = InitPayload::InitOk;
     reply.send(&mut stdout).context("reply to init message")?;
 
+    let mut echo_node = EchoNode::new();
+
     for msg in stdin {
         let msg = msg.unwrap();
         let msg: Message<EchoPayload> = serde_json::from_str(&msg)?;
-        let mut reply = msg.into_reply(Some(&mut 0));
-        if let EchoPayload::Echo { echo } = reply.body.payload {
-            reply.body.payload = EchoPayload::EchoOk { echo };
-        };
+        let reply = echo_node.handle_msg(msg);
         reply.send(&mut stdout).context("send echo response")?;
     }
 
