@@ -8,14 +8,14 @@ use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Message<Payload> {
-    src: String,
-    dest: String,
-    body: Body<Payload>,
+pub struct Message<Payload> {
+    pub src: String,
+    pub dest: String,
+    pub body: Body<Payload>,
 }
 
 impl<Payload> Message<Payload> {
-    fn into_reply(self, msg_id: Option<&mut u32>) -> Self {
+    pub fn into_reply(self, msg_id: Option<&mut u32>) -> Self {
         Self {
             src: self.dest,
             dest: self.src,
@@ -33,58 +33,33 @@ impl<Payload> Message<Payload> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body<Payload> {
-    in_reply_to: Option<u32>,
-    msg_id: Option<u32>,
+pub struct Body<Payload> {
+    pub in_reply_to: Option<u32>,
+    pub msg_id: Option<u32>,
     #[serde(flatten)]
-    payload: Payload,
+    pub payload: Payload,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-enum EchoPayload {
-    Echo { echo: String },
-    EchoOk { echo: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-enum InitPayload {
+pub enum InitPayload {
     Init(Init),
     InitOk,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Init {
-    node_id: String,
-    node_ids: Vec<String>,
+pub struct Init {
+    pub node_id: String,
+    pub node_ids: Vec<String>,
 }
 
-trait Node<Payload> {
+pub trait Node<Payload> {
     fn new(tx: Sender<Message<Payload>>) -> Self;
     fn handle_msg(self: &mut Self, msg: Message<Payload>);
 }
 
-struct EchoNode {
-    tx: Sender<Message<EchoPayload>>,
-}
 
-impl Node<EchoPayload> for EchoNode {
-    fn new(tx: Sender<Message<EchoPayload>>) -> Self {
-        Self { tx }
-    }
-
-    fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) {
-        let mut reply = msg.into_reply(Some(&mut 0));
-        if let EchoPayload::Echo { echo } = reply.body.payload {
-            reply.body.payload = EchoPayload::EchoOk { echo };
-        };
-        self.tx.send(reply).unwrap();
-    }
-}
-
-fn run<N, P>() -> Result<()>
+pub fn run<N, P>() -> Result<()>
 where
     N: Node<P>,
     P: Serialize + DeserializeOwned + Send + 'static,
@@ -125,8 +100,4 @@ where
     serde_json::to_writer(&mut out, &msg).context("write message to out")?;
     out.write_all(b"\n").context("write newline to out")?;
     Ok(())
-}
-
-fn main() -> Result<()> {
-    run::<EchoNode, EchoPayload>()
 }
