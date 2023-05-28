@@ -17,12 +17,12 @@ pub struct EchoNode {
 }
 
 impl Node<EchoPayload> for EchoNode {
-    fn new(tx: Sender<Message<EchoPayload>>) -> Self {
+    fn new(tx: Sender<Message<EchoPayload>>, _init: Init) -> Self {
         Self { tx }
     }
 
     fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) {
-        let mut reply = msg.into_reply(Some(&mut 0));
+        let mut reply = msg.into_reply(Some(0));
         if let EchoPayload::Echo { echo } = reply.body.payload {
             reply.body.payload = EchoPayload::EchoOk { echo };
         };

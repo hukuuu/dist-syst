@@ -15,17 +15,13 @@ pub struct Message<Payload> {
 }
 
 impl<Payload> Message<Payload> {
-    pub fn into_reply(self, msg_id: Option<&mut u32>) -> Self {
+    pub fn into_reply(self, msg_id: Option<u32>) -> Self {
         Self {
             src: self.dest,
             dest: self.src,
             body: Body {
                 in_reply_to: self.body.msg_id,
-                msg_id: msg_id.map(|id| {
-                    let mid = *id;
-                    *id += 1;
-                    mid
-                }),
+                msg_id,
                 payload: self.body.payload,
             },
         }
@@ -54,10 +50,9 @@ pub struct Init {
 }
 
 pub trait Node<Payload> {
-    fn new(tx: Sender<Message<Payload>>) -> Self;
+    fn new(tx: Sender<Message<Payload>>, init: Init) -> Self;
     fn handle_msg(self: &mut Self, msg: Message<Payload>);
 }
-
 
 pub fn run<N, P>() -> Result<()>
 where
@@ -68,12 +63,18 @@ where
     let mut stdout = std::io::stdout().lock();
 
     let init_msg: Message<InitPayload> = serde_json::from_str(&stdin.next().expect("ni raboti")?)?;
-    let mut reply = init_msg.into_reply(Some(&mut 0));
+    let init_payload = init_msg.body.payload.clone();
+
+    let mut reply = init_msg.into_reply(Some(0));
     reply.body.payload = InitPayload::InitOk;
     send(&mut stdout, reply)?;
 
     let (tx, rx) = channel();
-    let mut node = N::new(tx);
+    let InitPayload::Init(init) = init_payload else {
+        panic!("no init message payload!");
+    };
+
+    let mut node = N::new(tx, init);
 
     drop(stdout);
     let jh = thread::spawn(move || {
