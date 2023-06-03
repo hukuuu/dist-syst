@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Message<Payload> {
     pub src: String,
     pub dest: String,
@@ -71,7 +71,7 @@ impl IdGenerator {
 pub fn run<N, P>() -> Result<()>
 where
     N: Node<P>,
-    P: Serialize + DeserializeOwned + Send + 'static,
+    P: Serialize + DeserializeOwned + Send + 'static + std::fmt::Debug,
 {
     let mut stdin = std::io::stdin().lines();
     let mut stdout = std::io::stdout().lock();
@@ -110,8 +110,9 @@ where
 
 fn send<P>(mut out: &mut impl Write, msg: Message<P>) -> Result<()>
 where
-    P: Serialize,
+    P: Serialize + std::fmt::Debug,
 {
+    eprintln!("send: {:?}", &msg);
     serde_json::to_writer(&mut out, &msg).context("write message to out")?;
     out.write_all(b"\n").context("write newline to out")?;
     Ok(())
