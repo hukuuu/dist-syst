@@ -14,7 +14,7 @@ pub enum GeneratePayload {
 
 pub struct UniqueIdNode {
     tx: Sender<Message<GeneratePayload>>,
-    n: usize,
+    id: IdGenerator,
     node_id: String,
 }
 
@@ -22,18 +22,17 @@ impl Node<GeneratePayload> for UniqueIdNode {
     fn new(tx: Sender<Message<GeneratePayload>>, init: Init) -> Self {
         Self {
             tx,
-            n: 0,
+            id: IdGenerator::new(),
             node_id: init.node_id,
         }
     }
 
     fn handle_msg(self: &mut Self, msg: Message<GeneratePayload>) {
-        let mut reply = msg.into_reply(Some(0));
+        let mut reply = msg.into_reply(Some(self.id.next_id()));
         if let GeneratePayload::Generate = reply.body.payload {
             reply.body.payload = GeneratePayload::GenerateOk {
-                id: format!("{}-{}", self.node_id, self.n),
+                id: format!("{}-{}", self.node_id, self.id.next_id()),
             };
-            self.n += 1;
         };
         self.tx.send(reply).unwrap();
     }

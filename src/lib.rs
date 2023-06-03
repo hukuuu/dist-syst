@@ -54,6 +54,20 @@ pub trait Node<Payload> {
     fn handle_msg(self: &mut Self, msg: Message<Payload>);
 }
 
+pub struct IdGenerator {
+    n: u32,
+}
+
+impl IdGenerator {
+    pub fn new() -> Self {
+        Self { n: 0 }
+    }
+    pub fn next_id(&mut self) -> u32 {
+        self.n += 1;
+        self.n
+    }
+}
+
 pub fn run<N, P>() -> Result<()>
 where
     N: Node<P>,

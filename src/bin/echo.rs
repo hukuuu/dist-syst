@@ -14,15 +14,16 @@ pub enum EchoPayload {
 
 pub struct EchoNode {
     tx: Sender<Message<EchoPayload>>,
+    id: IdGenerator
 }
 
 impl Node<EchoPayload> for EchoNode {
-    fn new(tx: Sender<Message<EchoPayload>>, _init: Init) -> Self {
-        Self { tx }
+    fn new(tx: Sender<Message<EchoPayload>>, init: Init) -> Self {
+        Self { tx, id: IdGenerator::new() }
     }
 
     fn handle_msg(self: &mut Self, msg: Message<EchoPayload>) {
-        let mut reply = msg.into_reply(Some(0));
+        let mut reply = msg.into_reply(Some(self.id.next_id()));
         if let EchoPayload::Echo { echo } = reply.body.payload {
             reply.body.payload = EchoPayload::EchoOk { echo };
         };
