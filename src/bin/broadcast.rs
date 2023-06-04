@@ -18,12 +18,12 @@ pub enum BroadcastPayload {
     },
     TopologyOk,
     Broadcast {
-        message: Value,
+        message: u32,
     },
     BroadcastOk,
     Read,
     ReadOk {
-        messages: Vec<String>,
+        messages: Vec<u32>,
     },
 }
 
@@ -32,8 +32,7 @@ pub struct BroadcastNode {
     id: IdGenerator,
     node_id: String,
     neighbors: Vec<String>,
-    seen: HashSet<u32>,
-    values: HashSet<String>,
+    values: HashSet<u32>,
 }
 
 impl Node<BroadcastPayload> for BroadcastNode {
@@ -43,7 +42,6 @@ impl Node<BroadcastPayload> for BroadcastNode {
             id: IdGenerator::new(),
             node_id: init.node_id,
             neighbors: Vec::new(),
-            seen: HashSet::new(),
             values: HashSet::new(),
         }
     }
@@ -60,12 +58,8 @@ impl Node<BroadcastPayload> for BroadcastNode {
                 self.tx.send(reply).context("Sending topology ok").unwrap();
             }
             BroadcastPayload::Broadcast { message } => {
-                let Some(msg_id) = msg.body.msg_id else {
-                    panic!("broadcast without msg_id: {:?}", msg);
-                };
-                if !self.seen.contains(&msg_id) {
-                    self.seen.insert(msg_id);
-                    self.values.insert(serde_json::to_string(&message).unwrap());
+                if !self.values.contains(&message) {
+                    self.values.insert(message);
 
                     for neighbor in &self.neighbors {
                         let mut msg = msg.clone();
