@@ -7,7 +7,6 @@ use std::{
 use anyhow::{Context, Result};
 use fly_dist_sys::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -62,6 +61,9 @@ impl Node<BroadcastPayload> for BroadcastNode {
                     self.values.insert(message);
 
                     for neighbor in &self.neighbors {
+                        if neighbor.eq(&msg.src) {
+                            continue;
+                        }
                         let mut msg = msg.clone();
                         msg.src = self.node_id.clone();
                         msg.dest = neighbor.clone();
