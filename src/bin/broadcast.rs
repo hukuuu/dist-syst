@@ -72,12 +72,15 @@ impl Node<BroadcastPayload> for BroadcastNode {
                     }
                 }
 
-                let mut reply = msg.into_reply(Some(self.id.next_id()));
-                reply.body.payload = BroadcastPayload::BroadcastOk;
-                self.tx
-                    .send(reply)
-                    .context("Message already seen, BroadcastOk")
-                    .unwrap();
+                //only reply to clients, nodes dont need ack
+                if msg.src.starts_with("c") {
+                    let mut reply = msg.into_reply(Some(self.id.next_id()));
+                    reply.body.payload = BroadcastPayload::BroadcastOk;
+                    self.tx
+                        .send(reply)
+                        .context("Message already seen, BroadcastOk")
+                        .unwrap();
+                }
 
                 ()
             }
@@ -92,7 +95,7 @@ impl Node<BroadcastPayload> for BroadcastNode {
                     .unwrap();
             }
 
-            BroadcastPayload::BroadcastOk => {},
+            BroadcastPayload::BroadcastOk => {}
             BroadcastPayload::TopologyOk => unreachable!(),
             BroadcastPayload::ReadOk { messages: _ } => unreachable!(),
         }
